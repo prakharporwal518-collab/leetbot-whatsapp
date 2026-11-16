@@ -21,9 +21,11 @@ from dotenv import load_dotenv
 load_dotenv()  # read the .env file into environment variables
 log = logging.getLogger(__name__)
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
-PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "")
-VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "")
+# .strip() removes spaces/newlines that sneak in when a value is copy-pasted
+# into .env or Render - an invisible trailing newline would break everything.
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "").strip()
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "").strip()
+VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
 
 GRAPH_API_VERSION = "v21.0"
 
@@ -47,7 +49,7 @@ def verify_webhook(mode, token, challenge):
 
     Returns (body, http_status).
     """
-    if mode == "subscribe" and VERIFY_TOKEN and token == VERIFY_TOKEN:
+    if mode == "subscribe" and VERIFY_TOKEN and (token or "").strip() == VERIFY_TOKEN:
         return challenge or "", 200
     return "Forbidden", 403
 

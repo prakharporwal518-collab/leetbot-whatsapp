@@ -21,10 +21,10 @@ from dotenv import load_dotenv
 load_dotenv()
 log = logging.getLogger(__name__)
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile")
-LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "llama-3.1-8b-instant")
-LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1").strip()
+LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile").strip()
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "llama-3.1-8b-instant").strip()
+LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 
 MAX_RETRIES = 2          # extra tries on the main model after a 429
 MAX_WAIT_SECONDS = 20    # never sleep longer than this between tries

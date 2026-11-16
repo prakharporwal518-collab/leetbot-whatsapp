@@ -149,3 +149,7 @@ def test_send_text_failure_returns_false_and_is_not_counted():
     with patch("whatsapp.requests.post", return_value=bad):
         assert whatsapp.send_text("919999", "hello") is False
     assert whatsapp.messages_sent_this_month() == before
+
+
+def test_verify_ignores_stray_whitespace_from_copy_paste():
+    assert whatsapp.verify_webhook("subscribe", " my-verify-token\n", "abc")[1] == 200
