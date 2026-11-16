@@ -22,8 +22,8 @@ load_dotenv()
 log = logging.getLogger(__name__)
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1").strip()
-LLM_MODEL = os.getenv("LLM_MODEL", "llama-3.3-70b-versatile").strip()
-LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "llama-3.1-8b-instant").strip()
+LLM_MODEL = os.getenv("LLM_MODEL", "openai/gpt-oss-120b").strip()
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "openai/gpt-oss-20b").strip()
 LLM_API_KEY = os.getenv("LLM_API_KEY", "").strip()
 
 MAX_RETRIES = 2          # extra tries on the main model after a 429
@@ -186,6 +186,29 @@ def _wait_time(error, attempt):
     return max(1.0, min(seconds, MAX_WAIT_SECONDS))
 
 
+# Words that mark a model as NOT a chat model (speech, safety filters...).
+NOT_CHAT_MODELS = ("whisper", "guard", "tts", "embed", "orpheus", "compound", "safeguard")
+
+_discovered_model = None  # remembered after the first successful auto-pick
+
+
+def _discover_model():
+    """
+    Providers retire models from time to time. If the models named in .env no
+    longer exist, ask the provider which models DO exist and pick one, so the
+    bot keeps working until you update LLM_MODEL.
+    """
+    try:
+        available = [model.id for model in _get_client().models.list()]
+    except openai.OpenAIError as error:
+        log.error("Could not list models: %s", error)
+        return None
+    log.warning("Configured models were not found. Available models: %s", available)
+    chat_models = [name for name in available
+                   if not any(word in name.lower() for word in NOT_CHAT_MODELS)]
+    return chat_models[0] if chat_models else None
+
+
 def chat(messages):
     """
     Ask the LLM, surviving free-tier rate limits:
@@ -193,11 +216,16 @@ def chat(messages):
       fallback model:  1 try
     Raises RateLimited if we were rate-limited all the way, LLMError otherwise.
     """
+    global _discovered_model
+
     models = [LLM_MODEL]
     if LLM_FALLBACK_MODEL and LLM_FALLBACK_MODEL != LLM_MODEL:
         models.append(LLM_FALLBACK_MODEL)
+    if _discovered_model:
+        models = [_discovered_model]
 
     was_rate_limited = False
+    models_missing = 0
     for index, model in enumerate(models):
         attempts = 1 + MAX_RETRIES if index == 0 else 1
         for attempt in range(attempts):
@@ -208,11 +236,30 @@ def chat(messages):
                 log.warning("429 rate limit on %s (try %d/%d)", model, attempt + 1, attempts)
                 if attempt < attempts - 1:
                     time.sleep(_wait_time(error, attempt))
+            except openai.NotFoundError as error:
+                # The provider retired this model name.
+                models_missing += 1
+                log.error("Model %s does not exist any more: %s", model, error)
+                break
             except openai.OpenAIError as error:
-                # Any other problem (model removed, server error, bad key...):
-                # no point retrying the same model, move on to the fallback.
+                # Any other problem (server error, bad key...): no point
+                # retrying the same model, move on to the fallback.
                 log.error("LLM error on %s: %s", model, error)
                 break
+
+    # Every configured model is gone: pick a living one automatically.
+    if models_missing == len(models) and not _discovered_model:
+        replacement = _discover_model()
+        if replacement:
+            log.warning("Using %s instead - please update LLM_MODEL", replacement)
+            try:
+                reply = _call_model(replacement, messages)
+                _discovered_model = replacement
+                return reply
+            except openai.RateLimitError:
+                was_rate_limited = True
+            except openai.OpenAIError as error:
+                log.error("LLM error on %s: %s", replacement, error)
 
     if was_rate_limited:
         raise RateLimited()

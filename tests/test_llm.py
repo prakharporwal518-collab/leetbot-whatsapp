@@ -130,3 +130,38 @@ def test_chat_raises_llm_error_when_both_models_fail():
     with patch("llm._call_model", side_effect=openai.OpenAIError("boom")):
         with pytest.raises(llm.LLMError):
             llm.chat([])
+
+
+# ---- retired models: auto-pick a living one ----
+
+def not_found_error():
+    response = SimpleNamespace(request=None, status_code=404, headers={})
+    return openai.NotFoundError("model does not exist", response=response, body=None)
+
+
+@pytest.fixture
+def no_discovered_model():
+    llm._discovered_model = None
+    yield
+    llm._discovered_model = None
+
+
+def test_chat_picks_an_available_model_when_configured_ones_are_retired(no_discovered_model):
+    listed = [SimpleNamespace(id="whisper-large-v3"), SimpleNamespace(id="new/chat-model")]
+    fake_client = SimpleNamespace(models=SimpleNamespace(list=lambda: listed))
+    with patch("llm._get_client", return_value=fake_client), \
+         patch("llm._call_model", side_effect=[not_found_error(), not_found_error(), "ok"]) as call:
+        assert llm.chat([]) == "ok"
+        assert call.call_args_list[-1].args[0] == "new/chat-model"   # skipped the speech model
+        # the next question goes straight to the model that worked
+        call.side_effect = ["again"]
+        assert llm.chat([]) == "again"
+        assert call.call_args_list[-1].args[0] == "new/chat-model"
+
+
+def test_chat_raises_llm_error_when_no_model_can_be_found(no_discovered_model):
+    fake_client = SimpleNamespace(models=SimpleNamespace(list=lambda: []))
+    with patch("llm._get_client", return_value=fake_client), \
+         patch("llm._call_model", side_effect=not_found_error()):
+        with pytest.raises(llm.LLMError):
+            llm.chat([])
