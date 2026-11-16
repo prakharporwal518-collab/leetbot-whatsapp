@@ -16,6 +16,11 @@ language choice - lives inside the process and would not be shared by several.)
 """
 
 import logging
+# Loaded here on purpose: the "requests" library imports netrc lazily, the first
+# time it sends something. If that first time happens in two background threads
+# at once while the app is still starting, Python's import lock can deadlock and
+# every later send hangs forever. Importing it up-front avoids that.
+import netrc  # noqa: F401
 import os
 import sys
 import threading
@@ -310,7 +315,10 @@ for _name in ("WHATSAPP_TOKEN", "PHONE_NUMBER_ID", "VERIFY_TOKEN", "LLM_API_KEY"
 # On Render (which sets the RENDER variable), check once at start-up that Meta
 # will really forward messages to this app - see whatsapp.ensure_app_subscribed.
 if os.getenv("RENDER") and os.getenv("WHATSAPP_TOKEN"):
-    run_in_background(whatsapp.ensure_app_subscribed)
+    # Wait a few seconds so the app has completely finished starting first.
+    _startup_check = threading.Timer(10, whatsapp.ensure_app_subscribed)
+    _startup_check.daemon = True
+    _startup_check.start()
 
 
 if __name__ == "__main__":
