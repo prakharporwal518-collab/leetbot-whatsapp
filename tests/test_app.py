@@ -188,3 +188,9 @@ def test_leetcode_being_down_still_answers(client, sent):
         client.post("/whatsapp", json=text_payload(body="#206"))
     assert "LeetCode problem '206'" in chat.call_args.args[0][-1]["content"]
     assert len(sent) == 1
+
+
+def test_privacy_page(client):
+    response = client.get("/privacy")
+    assert response.status_code == 200
+    assert "Privacy Policy" in response.get_data(as_text=True)

@@ -231,6 +231,48 @@ def health():
     return "ok", 200
 
 
+PRIVACY_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LeetBot - Privacy Policy</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;
+padding:0 16px;line-height:1.6;color:#222}h1,h2{line-height:1.25}</style></head><body>
+<h1>LeetBot - Privacy Policy</h1>
+<p>LeetBot is a personal, non-commercial WhatsApp chatbot that explains
+programming problems. This page describes what happens to the messages you send it.</p>
+<h2>What LeetBot receives</h2>
+<p>When you message LeetBot, it receives your WhatsApp phone number and the text
+of your message through the WhatsApp Business Platform (Meta).</p>
+<h2>How it is used</h2>
+<ul>
+<li>Your message text is sent to an AI language-model provider (Groq) to write the
+answer. Your phone number is not sent to that provider.</li>
+<li>If you ask for a LeetCode problem, the problem number or name is looked up on
+leetcode.com. No personal data is sent.</li>
+<li>The answer is sent back to you on WhatsApp.</li>
+</ul>
+<h2>What is stored</h2>
+<p>LeetBot has no database. It keeps only your last 6 messages and your language
+choice in the server's memory so follow-up questions work. This memory is erased
+whenever the server restarts. Server logs may briefly contain phone numbers and
+technical error details.</p>
+<h2>Sharing</h2>
+<p>Your data is never sold or used for advertising. It is shared only with the
+services needed to answer you: Meta (WhatsApp), Groq and the hosting provider (Render).</p>
+<h2>Your choices</h2>
+<p>Stop messaging the bot at any time and no further data is processed. To ask a
+question or request removal of any data, contact the owner through the project page:
+<a href="https://github.com/prakharporwal518-collab/leetbot-whatsapp">
+github.com/prakharporwal518-collab/leetbot-whatsapp</a>.</p>
+</body></html>"""
+
+
+@app.get("/privacy")
+def privacy():
+    """Public privacy policy page (Meta requires one before an app can be published)."""
+    return PRIVACY_PAGE, 200
+
+
 @app.get("/")
 def home():
     return "LeetBot is running. Message it on WhatsApp!", 200
