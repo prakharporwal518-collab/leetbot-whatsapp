@@ -179,6 +179,7 @@ def handle_message(sender, text):
         log.exception("Failed to handle message from %s", sender)
         messages = [ERROR_REPLY]
     try:
+        log.info("Sending %d message(s) to ...%s", len(messages), sender[-4:])
         whatsapp.send_messages(sender, messages)
     except Exception:
         log.exception("Failed to send reply to %s", sender)
@@ -209,6 +210,7 @@ def webhook():
     """Meta calls this for every incoming message and every status update."""
     try:
         payload = request.get_json(silent=True) or {}
+        log.info("Webhook: %s", whatsapp.describe_webhook(payload))
         message = whatsapp.parse_incoming(payload)
 
         # Not a message (e.g. "delivered"/"read" status) or a retry we've seen.

@@ -83,6 +83,28 @@ def parse_incoming(payload):
         return None
 
 
+def describe_webhook(payload):
+    """
+    One short line describing a webhook, for the log (no message text).
+    Very handy when debugging: it shows delivery failures that Meta reports
+    back as "statuses", including the reason.
+    """
+    try:
+        change = payload["entry"][0]["changes"][0]
+        value = change.get("value", {})
+        parts = [f"field={change.get('field')}"]
+        for message in value.get("messages", []):
+            parts.append(f"message type={message.get('type')} keys={sorted(message)}")
+        for status in value.get("statuses", []):
+            errors = [f"{e.get('code')}: {e.get('title')} - "
+                      f"{(e.get('error_data') or {}).get('details')}"
+                      for e in status.get("errors", [])]
+            parts.append(f"status={status.get('status')} errors={errors}")
+        return "; ".join(parts)
+    except (KeyError, IndexError, TypeError, AttributeError):
+        return f"unrecognised payload with keys {sorted(payload) if isinstance(payload, dict) else type(payload)}"
+
+
 # ---------------------------------------------------------------------------
 # 3. Formatting + packing replies into as few messages as possible
 # ---------------------------------------------------------------------------
