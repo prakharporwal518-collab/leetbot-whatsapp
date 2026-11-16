@@ -284,6 +284,12 @@ for _name in ("WHATSAPP_TOKEN", "PHONE_NUMBER_ID", "VERIFY_TOKEN", "LLM_API_KEY"
         log.warning("Environment variable %s is not set - check your .env", _name)
 
 
+# On Render (which sets the RENDER variable), check once at start-up that Meta
+# will really forward messages to this app - see whatsapp.ensure_app_subscribed.
+if os.getenv("RENDER") and os.getenv("WHATSAPP_TOKEN"):
+    run_in_background(whatsapp.ensure_app_subscribed)
+
+
 if __name__ == "__main__":
     # Local development server. On Render, gunicorn runs `app` instead.
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))

@@ -265,3 +265,57 @@ def send_text(to, body):
 def send_messages(to, messages):
     """Send several messages in order. Returns how many were sent successfully."""
     return sum(1 for message in messages if send_text(to, message))
+
+
+# ---------------------------------------------------------------------------
+# 5. Self-check: is our Meta app subscribed to the WhatsApp account?
+# ---------------------------------------------------------------------------
+
+GRAPH_URL = f"https://graph.facebook.com/{GRAPH_API_VERSION}"
+
+
+def _graph(method, path, **params):
+    """Small helper: call the Graph API with our token and return the JSON."""
+    response = requests.request(
+        method, f"{GRAPH_URL}/{path}", params=params, timeout=15,
+        headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}"})
+    return response.json()
+
+
+def ensure_app_subscribed():
+    """
+    Meta only forwards real messages to apps that are "subscribed" to the
+    WhatsApp Business Account (WABA) that owns the phone number. The dashboard
+    usually does this for you, but not always (for example when a second app
+    shares the same test account) - then the webhook verifies fine, yet no
+    message ever arrives. This function checks and fixes that. It never raises;
+    it only writes what it found to the log.
+    """
+    try:
+        # 1. Which WhatsApp accounts may this token manage?
+        info = _graph("GET", "debug_token", input_token=WHATSAPP_TOKEN).get("data", {})
+        waba_ids = []
+        for scope in info.get("granular_scopes", []):
+            if scope.get("scope", "").startswith("whatsapp_business"):
+                waba_ids.extend(scope.get("target_ids", []))
+        waba_ids = list(dict.fromkeys(waba_ids))  # remove duplicates, keep order
+        if not waba_ids:
+            log.warning("Subscription check: token lists no WhatsApp account "
+                        "(token valid: %s, scopes: %s)", info.get("is_valid"), info.get("scopes"))
+            return
+
+        # 2. Find the account that owns OUR phone number, and subscribe to it.
+        for waba_id in waba_ids:
+            numbers = _graph("GET", f"{waba_id}/phone_numbers").get("data", [])
+            if PHONE_NUMBER_ID not in [number.get("id") for number in numbers]:
+                continue
+            before = _graph("GET", f"{waba_id}/subscribed_apps").get("data", [])
+            names = [app.get("whatsapp_business_api_data", {}).get("name") for app in before]
+            result = _graph("POST", f"{waba_id}/subscribed_apps")
+            log.info("Subscription check: account %s had apps %s subscribed; "
+                     "subscribing this app -> %s", waba_id, names, result)
+            return
+        log.warning("Subscription check: PHONE_NUMBER_ID %s was not found in the "
+                    "accounts this token can see (%s)", PHONE_NUMBER_ID, waba_ids)
+    except Exception as error:
+        log.warning("Subscription check failed: %s", error)

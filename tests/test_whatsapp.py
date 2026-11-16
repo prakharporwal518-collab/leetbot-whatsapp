@@ -153,3 +153,29 @@ def test_send_text_failure_returns_false_and_is_not_counted():
 
 def test_verify_ignores_stray_whitespace_from_copy_paste():
     assert whatsapp.verify_webhook("subscribe", " my-verify-token\n", "abc")[1] == 200
+
+
+def test_ensure_app_subscribed_subscribes_the_account_that_owns_our_number():
+    calls = []
+
+    def fake_request(method, url, **kwargs):
+        calls.append((method, url.split("/v21.0/")[1]))
+        answers = {
+            ("GET", "debug_token"): {"data": {"granular_scopes": [
+                {"scope": "whatsapp_business_management", "target_ids": ["111", "222"]}]}},
+            ("GET", "111/phone_numbers"): {"data": [{"id": "99999"}]},
+            ("GET", "222/phone_numbers"): {"data": [{"id": "12345"}]},   # our PHONE_NUMBER_ID
+            ("GET", "222/subscribed_apps"): {"data": []},
+            ("POST", "222/subscribed_apps"): {"success": True},
+        }
+        return MagicMock(json=lambda: answers[calls[-1]])
+
+    with patch("whatsapp.requests.request", side_effect=fake_request):
+        whatsapp.ensure_app_subscribed()
+    assert ("POST", "222/subscribed_apps") in calls
+    assert ("POST", "111/subscribed_apps") not in calls
+
+
+def test_ensure_app_subscribed_never_raises():
+    with patch("whatsapp.requests.request", side_effect=ConnectionError("down")):
+        whatsapp.ensure_app_subscribed()
