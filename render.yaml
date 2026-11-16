@@ -1,0 +1,30 @@
+# Render "Blueprint": tells Render how to build and run LeetBot on the FREE plan.
+services:
+  - type: web
+    name: leetbot-whatsapp
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # 1 worker: the bot keeps its memory (seen message ids, chat history) inside
+    # the process. 8 threads: several chats can be handled at the same time.
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 120 --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      # "sync: false" = Render asks you to type the value in the dashboard
+      # (secrets are never stored in this file).
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
+      - key: VERIFY_TOKEN
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: LLM_FALLBACK_MODEL
+        value: openai/gpt-oss-20b
