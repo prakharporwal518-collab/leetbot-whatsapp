@@ -26,6 +26,9 @@ log = logging.getLogger(__name__)
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "").strip()
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "").strip()
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "").strip()
+# Optional: the "WhatsApp Business Account ID" shown next to the Phone number ID
+# in the Meta dashboard. Only used by the start-up subscription check below.
+WABA_ID = os.getenv("WABA_ID", "").strip()
 
 GRAPH_API_VERSION = "v21.0"
 
@@ -298,10 +301,13 @@ def ensure_app_subscribed():
         for scope in info.get("granular_scopes", []):
             if scope.get("scope", "").startswith("whatsapp_business"):
                 waba_ids.extend(scope.get("target_ids", []))
+        if WABA_ID:
+            waba_ids.insert(0, WABA_ID)  # the id you gave in the settings wins
         waba_ids = list(dict.fromkeys(waba_ids))  # remove duplicates, keep order
         if not waba_ids:
-            log.warning("Subscription check: token lists no WhatsApp account "
-                        "(token valid: %s, scopes: %s)", info.get("is_valid"), info.get("scopes"))
+            log.warning("Subscription check: token lists no WhatsApp account - set "
+                        "WABA_ID to check (token valid: %s, scopes: %s)",
+                        info.get("is_valid"), info.get("scopes"))
             return
 
         # 2. Find the account that owns OUR phone number, and subscribe to it.
