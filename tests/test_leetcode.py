@@ -135,3 +135,28 @@ def test_number_map_is_cached(fake_leetcode):
     leetcode.fetch_problem("1")
     leetcode.fetch_problem("206")
     assert get.call_count == 1  # downloaded the big list only once
+
+
+def test_number_lookup_falls_back_to_search_when_list_is_blocked():
+    """LeetCode answers 403 for the big list on some servers; search still works."""
+    import requests as real_requests
+
+    def blocked_get(url, **kwargs):
+        raise real_requests.HTTPError("403 Client Error: Forbidden")
+
+    def post_with_search(url, json=None, **kwargs):
+        if "searchKeywords" in str(json["variables"]):
+            response = MagicMock()
+            response.json.return_value = {"data": {"problemsetQuestionList": {"questions": [
+                {"frontendQuestionId": "2060", "titleSlug": "something-else"},
+                {"frontendQuestionId": "206", "titleSlug": "reverse-linked-list"}]}}}
+            return response
+        return fake_post(url, json=json, **kwargs)
+
+    with patch("leetcode.requests.get", side_effect=blocked_get), \
+         patch("leetcode.requests.post", side_effect=post_with_search) as post:
+        assert leetcode.fetch_problem("206")["title"] == "Reverse Linked List"
+        calls_after_first = post.call_count
+        leetcode.fetch_problem("206")
+    # second time: the slug is remembered, so only the problem itself is fetched
+    assert post.call_count == calls_after_first + 1

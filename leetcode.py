@@ -130,9 +130,47 @@ def _load_slug_map():
     return mapping
 
 
+# Backup way to turn a number into a slug: LeetCode's search, through GraphQL.
+SEARCH_QUERY = """
+query problemsetQuestionList($categorySlug: String, $limit: Int, $skip: Int,
+                             $filters: QuestionListFilterInput) {
+  problemsetQuestionList: questionList(categorySlug: $categorySlug, limit: $limit,
+                                       skip: $skip, filters: $filters) {
+    questions: data { frontendQuestionId: questionFrontendId titleSlug }
+  }
+}
+"""
+
+
+def _search_slug(number):
+    """Ask LeetCode's search for problem `number` and return its slug (or None)."""
+    payload = {"query": SEARCH_QUERY, "variables": {
+        "categorySlug": "", "skip": 0, "limit": 50,
+        "filters": {"searchKeywords": str(number)}}}
+    response = requests.post(GRAPHQL_URL, json=payload, headers=HEADERS, timeout=TIMEOUT)
+    response.raise_for_status()
+    result = (response.json().get("data") or {}).get("problemsetQuestionList") or {}
+    for question in result.get("questions") or []:
+        if str(question.get("frontendQuestionId")) == str(number):
+            return question.get("titleSlug")
+    return None
+
+
 def number_to_slug(number):
     """'1' -> 'two-sum'. Returns None if there is no problem with that number."""
-    return _load_slug_map().get(str(number))
+    number = str(number)
+    if number in _slug_cache:
+        return _slug_cache[number]
+    try:
+        return _load_slug_map().get(number)
+    except requests.RequestException as error:
+        # LeetCode sometimes refuses the big "all problems" download from cloud
+        # servers (HTTP 403). Fall back to looking up just this one number.
+        log.warning("All-problems list unavailable (%s); searching for #%s instead", error, number)
+        slug = _search_slug(number)
+        if slug:
+            _slug_cache[number] = slug  # remember it for next time
+        return slug
 
 
 def strip_html(raw_html):
