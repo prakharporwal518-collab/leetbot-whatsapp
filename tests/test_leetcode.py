@@ -71,6 +71,10 @@ def fake_leetcode():
     ("solve leetcode.com/problems/3sum please", ("url", "3sum")),
     ("print a hollow diamond of stars", ("text", "print a hollow diamond of stars")),
     ("explain step 2", ("text", "explain step 2")),
+    ("expalin leetcode problem 75", ("number", "75")),
+    ("LC 206 in python please", ("number", "206")),
+    ("solve problem #15", ("number", "15")),
+    ("print numbers from 1 to 10", ("text", "print numbers from 1 to 10")),
 ])
 def test_parse_input(text, expected):
     assert leetcode.parse_input(text) == expected

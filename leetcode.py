@@ -60,6 +60,12 @@ CACHE_SECONDS = 24 * 60 * 60
 
 URL_PATTERN = re.compile(r"leetcode\.(?:com|cn)/problems/([a-z0-9-]+)", re.IGNORECASE)
 NUMBER_PATTERN = re.compile(r"^#?\s*(\d{1,5})$")
+# A problem number inside a sentence: "explain leetcode problem 75", "lc 75",
+# "solve problem #206". (Plain "explain step 2" must NOT match.)
+NUMBER_IN_TEXT_PATTERN = re.compile(
+    r"\b(?:leetcode|lc)\s*(?:problem|question|number|no\.?)?\s*#?\s*(\d{1,5})\b"
+    r"|\b(?:problem|question)\s*(?:number|no\.?)?\s*#?\s*(\d{1,5})\b",
+    re.IGNORECASE)
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -82,6 +88,11 @@ def parse_input(text):
     number_match = NUMBER_PATTERN.match(text)
     if number_match:
         return "number", str(int(number_match.group(1)))  # int() drops leading zeros
+
+    in_text_match = NUMBER_IN_TEXT_PATTERN.search(text)
+    if in_text_match:
+        number = in_text_match.group(1) or in_text_match.group(2)
+        return "number", str(int(number))
 
     # A slug has no spaces: "two-sum", "permutations".
     # Single words that are not real problems (like "thanks") simply won't be
