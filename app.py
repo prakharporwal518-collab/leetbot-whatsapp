@@ -17,7 +17,10 @@ language choice - lives inside the process and would not be shared by several.)
 
 import logging
 import os
+import sys
 import threading
+import time
+import traceback
 from collections import OrderedDict, deque
 
 from dotenv import load_dotenv
@@ -171,8 +174,26 @@ def build_reply(sender, text):
     return messages
 
 
+def _report_if_stuck(thread_id, started_at):
+    """Watchdog: if a reply is still not finished, log WHERE the code is waiting."""
+    frame = sys._current_frames().get(thread_id)
+    if frame is not None:
+        log.warning("Reply still running after %d s. Stuck here:\n%s",
+                    time.time() - started_at, "".join(traceback.format_stack(frame)[-12:]))
+
+
 def handle_message(sender, text):
     """Runs in a background thread. Must never raise."""
+    watchdog = threading.Timer(30, _report_if_stuck, [threading.get_ident(), time.time()])
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        _handle_message(sender, text)
+    finally:
+        watchdog.cancel()
+
+
+def _handle_message(sender, text):
     try:
         messages = build_reply(sender, text)
     except Exception:
