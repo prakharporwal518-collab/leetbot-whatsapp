@@ -144,6 +144,12 @@ def build_reply(sender, text):
             problem = leetcode.fetch_problem(text)
         except Exception as error:  # LeetCode down/blocked: the LLM can still try
             log.warning("LeetCode fetch failed for %r: %s", text, error)
+        if problem:
+            log.info("Fetched LeetCode %s: %s (%s), signatures for %s",
+                     problem["id"], problem["title"], problem["difficulty"],
+                     ", ".join(sorted(problem["snippets"])) or "none")
+        else:
+            log.info("No LeetCode problem found for %r - answering from the AI's knowledge", text)
 
     question = text
     if problem is None and kind in ("number", "url"):
